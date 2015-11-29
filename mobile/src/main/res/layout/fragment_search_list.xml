@@ -4,8 +4,17 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <SearchView
+        android:id="@+id/searchBooksView"
+        android:queryHint="Search"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+    </SearchView>
+
     <ListView
-        android:id="@+id/listBooks"
+        android:layout_below="@id/searchBooksView"
+        android:id="@android:id/list"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:padding="16dp">
@@ -16,6 +25,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:padding="16dp"
-        android:text="No Books in your Library"/>
+        android:text="No books found"/>
 
 </RelativeLayout>

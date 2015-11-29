@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+import com.j256.ormlite.field.DataType;
 import com.j256.ormlite.field.DatabaseField;
 import com.j256.ormlite.table.DatabaseTable;
 
@@ -59,7 +60,7 @@ public class Book implements Parcelable {
     @DatabaseField
     public String dateLoaned;
 
-    @DatabaseField
+    @DatabaseField (dataType = DataType.BYTE_ARRAY)
     public byte[] thumbNail;
 
     public static final Creator<Book> CREATOR = new Creator<Book>() {

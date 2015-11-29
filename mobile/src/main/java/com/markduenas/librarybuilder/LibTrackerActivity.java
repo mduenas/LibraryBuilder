@@ -53,9 +53,9 @@ import java.util.List;
 
 public class LibTrackerActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
 
-    private static int VIEW_LOOKUP = 0;
-    private static int VIEW_LIST_ITEMS = 1;
-    private static int VIEW_LIST_SEARCH = 2;
+    private static int VIEW_LIST = 0;
+    private static int VIEW_SEARCH = 1;
+    private static int VIEW_BOOK = 2;
 
     private DrawerLayout mDrawerLayout;
     private ActionBarDrawerToggle mDrawerToggle;
@@ -89,8 +89,42 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
+                if (mBook != null) {
+                    String field = "";
+                    String value = "";
+                    if (mBook.isbn13 != null && !mBook.isbn13.isEmpty()) {
+                        field = "isbn13";
+                        value = mBook.isbn13;
+                    } else if (mBook.isbn10 != null && !mBook.isbn10.isEmpty()) {
+                        field = "isbn10";
+                        value = mBook.isbn10;
+                    }
+                    if (field.isEmpty() || value.isEmpty()) {
+
+                        dbHelper.insertSingleDatabaseRowNoAppId(Book.class, mBook);
+                        Snackbar.make(view, String.format("%s has been added to your library!", mBook.title), Snackbar.LENGTH_LONG)
+                                .setAction("Action", null).show();
+                        selectItem(VIEW_LIST);
+                    } else {
+
+                        List<Book> temp = dbHelper.getDatabaseListFiltered(Book.class, field, value);
+                        if (temp.size() == 0) {
+
+                            // insert the book
+                            dbHelper.insertSingleDatabaseRowNoAppId(Book.class, mBook);
+                            Snackbar.make(view, String.format("%s has been added to your library!", mBook.title), Snackbar.LENGTH_LONG)
+                                    .setAction("Action", null).show();
+                            selectItem(VIEW_LIST);
+                        } else {
+
+                            // possible duplicate?
+                        }
+                    }
+
+                } else {
+                    Snackbar.make(view, "You must scan or create a book first", Snackbar.LENGTH_LONG)
+                            .setAction("Action", null).show();
+                }
             }
         });
 
@@ -105,7 +139,7 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
 
         initializeDb();
 
-        selectItem(1);
+        selectItem(VIEW_LIST);
     }
 
     private void initializeDb() {
@@ -251,55 +285,22 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
 
         switch (position) {
 
-            case 0: //VIEW_LOOKUP
-                TextView info = (TextView)findViewById(R.id.tvIsbnInfo);
-                if (info != null) {
-                    if (mBook != null) {
-                        String isbnInfo = String.format("Title: %s\n", mBook.title);
-                        isbnInfo += String.format("Author: %s\n", mBook.author);
-                        isbnInfo += String.format("Description: %s\n", mBook.description);
-                        isbnInfo += String.format("Publisher: %s\n", mBook.publisher);
-                        isbnInfo += String.format("Pages: %d\n", mBook.pages);
-                        isbnInfo += String.format("Language: %s\n", mBook.language);
-                        isbnInfo += String.format("Category: %s\n", mBook.category);
-                        isbnInfo += String.format("Publication: %s\n", mBook.publication);
-                        info.setText(isbnInfo);
+            case 0: //VIEW_SEARCH
 
-                    } else {
-                        info.setText("Searching for book...");
-                    }
-                }
-                ImageView image = (ImageView)findViewById(R.id.imageView);
-                if (image != null) {
-                    if (mBook.thumbNail != null && mBook.thumbNail.length > 0) {
-                        image.setImageBitmap(BitmapFactory.decodeByteArray(mBook.thumbNail, 0, mBook.thumbNail.length));
-                    } else {
-                        image.setImageDrawable(getResources().getDrawable(R.drawable.no_image));
-                    }
-                }
 
                 break;
             case 1:  //VIEW_LIST
                 // populate the book list
-                TextView empty = (TextView)findViewById(android.R.id.empty);
-                ListView listView = (ListView)findViewById(android.R.id.list);
-                if (listView != null) {
-                    bookList = dbHelper.getDatabaseListNoAppId(Book.class);
-                    if (bookList != null) {
-                        ItemListAdapter adapter = new ItemListAdapter(LibTrackerActivity.this, R.layout.item_list_item, (Book[]) bookList.toArray());
-                        listView.setEmptyView(empty);
-                        listView.setAdapter(adapter);
-                    }
-                }
+
                 break;
-            case 2:  //VIEW_SEARCH
-                // populate the search list
+            case 2:  //VIEW_BOOK
+
                 break;
         }
     }
 
     /**
-     * Fragment that appears in the "content_frame", shows a planet
+     * Fragment that appears in the "content_frame"
      */
     public static class ContentFragment extends Fragment {
 
@@ -317,6 +318,7 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
         @Override
         public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 
+            LibTrackerActivity mainActivity = (LibTrackerActivity)getActivity();
             View rootView = null;
             int i = getArguments().getInt(ARG_VIEW_NUMBER);
 
@@ -324,16 +326,73 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
 
                 // inflate the list view and populate it
                 rootView = inflater.inflate(R.layout.fragment_list, container, false);
+                TextView empty = (TextView)rootView.findViewById(android.R.id.empty);
+                ListView listView = (ListView)rootView.findViewById(R.id.listBooks);
+                if (listView != null) {
+                    LibraryDBHelper dbHelper = LibraryDBHelper.createInstance(mainActivity);
+                    List<Book> bookList = dbHelper.getDatabaseListNoAppId(Book.class);
+                    if (bookList != null) {
+                        Book[] bookArray = new Book[bookList.size()];
+                        int counter = 0;
+                        for (Book b :
+                                bookList) {
+                            bookArray[counter] = b;
+                            counter++;
+                        }
+                        ItemListAdapter adapter = new ItemListAdapter(mainActivity, R.layout.item_list_item, bookArray);
+                        listView.setEmptyView(empty);
+                        listView.setAdapter(adapter);
+                    }
+                }
 
             } else if (i == ARG_BOOK) {
 
                 // inflate the book view and populate it
                 rootView = inflater.inflate(R.layout.fragment_book, container, false);
+                // populate the search list
+                TextView info = (TextView)rootView.findViewById(R.id.tvIsbnInfo);
+                if (info != null) {
+                    if (mainActivity.mBook != null) {
+                        String isbnInfo = String.format("Title: %s\n", mainActivity.mBook.title);
+                        isbnInfo += String.format("Author: %s\n", mainActivity.mBook.author);
+                        isbnInfo += String.format("Description: %s\n", mainActivity.mBook.description);
+                        isbnInfo += String.format("Publisher: %s\n", mainActivity.mBook.publisher);
+                        isbnInfo += String.format("Pages: %d\n", mainActivity.mBook.pages);
+                        isbnInfo += String.format("Language: %s\n", mainActivity.mBook.language);
+                        isbnInfo += String.format("Category: %s\n", mainActivity.mBook.category);
+                        isbnInfo += String.format("Publication: %s\n", mainActivity.mBook.publication);
+                        info.setText(isbnInfo);
+
+                    } else {
+                        info.setText("Searching for book...");
+                    }
+                }
+                ImageView image = (ImageView)rootView.findViewById(R.id.imageViewBook);
+                if (image != null) {
+                    if (mainActivity.mBook != null) {
+                        if (mainActivity.mBook.thumbNail != null && mainActivity.mBook.thumbNail.length > 0) {
+                            image.setImageBitmap(BitmapFactory.decodeByteArray(mainActivity.mBook.thumbNail, 0, mainActivity.mBook.thumbNail.length));
+                        } else {
+                            image.setImageDrawable(getResources().getDrawable(R.drawable.no_image));
+                        }
+                    } else {
+                        image.setImageDrawable(getResources().getDrawable(R.drawable.no_image));
+                    }
+                }
 
             } else if (i == ARG_SEARCH) {
 
                 // inflate the search view and populate it
-                rootView = inflater.inflate(R.layout.fragment_list, container, false);
+                rootView = inflater.inflate(R.layout.fragment_search_list, container, false);
+                TextView empty = (TextView)rootView.findViewById(android.R.id.empty);
+                ListView listView = (ListView)rootView.findViewById(android.R.id.list);
+                if (listView != null) {
+                    if (mainActivity.searchList != null) {
+                        ItemListAdapter adapter = new ItemListAdapter(mainActivity, R.layout.item_list_item, (Book[]) mainActivity.searchList.toArray());
+                        listView.setEmptyView(empty);
+                        listView.setAdapter(adapter);
+                    }
+                }
             }
 
             return rootView;
@@ -354,9 +413,9 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
             IntentResult scanResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, intent);
             if (scanResult != null && scanResult.getContents() != null) {
                 // handle scan result
+                selectItem(2);
                 mBook = new Book();
                 mCurrentISBN = scanResult.getContents();
-
                 GetISBNInfo getISBNInfo = new GetISBNInfo();
                 getISBNInfo.execute(String.format("http://isbndb.com/api/v2/json/W8INIP1P/books?q=%s", mCurrentISBN));
             }
@@ -519,7 +578,7 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
                     }
                 }
             }
-            selectItem(0);
+            selectItem(2);
         }
 
         protected byte[] imageByter(String strurl) {
