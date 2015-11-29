@@ -57,7 +57,11 @@ public class ItemListAdapter extends ArrayAdapter<Book> {
         Book book = data[position];
         if (book != null) {
             byte[] bytes = book.thumbNail;
-            holder.imageThumb.setImageBitmap(BitmapFactory.decodeByteArray(bytes, 0, bytes.length));
+            if (bytes != null && bytes.length > 0) {
+                holder.imageThumb.setImageBitmap(BitmapFactory.decodeByteArray(bytes, 0, bytes.length));
+            } else {
+                holder.imageThumb.setImageDrawable(context.getDrawable(R.drawable.no_image));
+            }
             holder.tvTitle.setText(book.title);
             holder.tvAuthor.setText(book.author);
             holder.tvPublisher.setText(book.publisher);

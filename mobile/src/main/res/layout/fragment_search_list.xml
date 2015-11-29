@@ -7,9 +7,11 @@
     <SearchView
         android:id="@+id/searchBooksView"
         android:queryHint="Search"
+        android:iconifiedByDefault="false"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
+        <requestFocus />
     </SearchView>
 
     <ListView
@@ -21,6 +23,7 @@
     </ListView>
 
     <TextView
+        android:layout_below="@id/searchBooksView"
         android:id="@android:id/empty"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

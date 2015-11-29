@@ -51,7 +51,7 @@ import java.net.URL;
 import java.util.List;
 
 
-public class LibTrackerActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
+public class LibTrackerActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener, ListView.OnItemClickListener {
 
     private static int VIEW_LIST = 0;
     private static int VIEW_SEARCH = 1;
@@ -63,6 +63,13 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
     LibraryDBHelper dbHelper = null;
 
     CharSequence mTitle;
+
+    @Override
+    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+        mBook = (Book)parent.getAdapter().getItem(position);
+        selectItem(2);
+    }
 
     class SearchItem {
         String title;
@@ -118,6 +125,8 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
                         } else {
 
                             // possible duplicate?
+                            Snackbar.make(view, String.format("%s is already in your library!", mBook.title), Snackbar.LENGTH_LONG)
+                                    .setAction("Action", null).show();
                         }
                     }
 
@@ -238,11 +247,11 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
             Scanner.acquireCameraScan(LibTrackerActivity.this);
         } else if (id == R.id.nav_search) {
 
-            selectItem(0);
+            selectItem(VIEW_SEARCH);
 
         } else if (id == R.id.nav_my_books) {
 
-            selectItem(1);
+            selectItem(VIEW_LIST);
 
         } else if (id == R.id.nav_manage) {
 
@@ -342,6 +351,7 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
                         ItemListAdapter adapter = new ItemListAdapter(mainActivity, R.layout.item_list_item, bookArray);
                         listView.setEmptyView(empty);
                         listView.setAdapter(adapter);
+                        listView.setOnItemClickListener(mainActivity);
                     }
                 }
 
