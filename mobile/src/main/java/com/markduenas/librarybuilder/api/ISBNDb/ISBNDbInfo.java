@@ -1,4 +1,4 @@
-package com.markduenas.librarybuilder.db.ISBNDb;
+package com.markduenas.librarybuilder.api.ISBNDb;
 
 
 import com.google.gson.annotations.Expose;

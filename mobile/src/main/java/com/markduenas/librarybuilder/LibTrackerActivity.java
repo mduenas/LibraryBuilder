@@ -1,5 +1,7 @@
 package com.markduenas.librarybuilder;
 
+import android.app.Fragment;
+import android.app.FragmentManager;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -14,19 +16,29 @@ import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ImageView;
+import android.widget.ListView;
 import android.widget.TextView;
 
 import com.google.gson.Gson;
-import com.markduenas.librarybuilder.db.GoogleBooks.GoogleBookInfo;
-import com.markduenas.librarybuilder.db.GoogleBooks.VolumeInfo;
-import com.markduenas.librarybuilder.db.ISBNDb.ISBNDbInfo;
+import com.markduenas.librarybuilder.api.GoogleBooks.GoogleBookInfo;
+import com.markduenas.librarybuilder.api.GoogleBooks.Item;
+import com.markduenas.librarybuilder.api.GoogleBooks.VolumeInfo;
+import com.markduenas.librarybuilder.api.ISBNDb.AuthorDatum;
+import com.markduenas.librarybuilder.api.ISBNDb.Datum;
+import com.markduenas.librarybuilder.api.ISBNDb.ISBNDbInfo;
+import com.markduenas.librarybuilder.db.Book;
+import com.markduenas.librarybuilder.db.LibraryDBHelper;
 import com.markduenas.librarybuilder.util.IntentIntegrator;
 import com.markduenas.librarybuilder.util.IntentResult;
 import com.markduenas.librarybuilder.util.Scanner;
+import com.markduenas.librarybuilder.widget.ItemListAdapter;
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.Request;
 import com.squareup.okhttp.Response;
@@ -36,29 +48,42 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.List;
 
 
+public class LibTrackerActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
 
-public class LibTrackerActivity extends AppCompatActivity
-        implements NavigationView.OnNavigationItemSelectedListener {
+    private static int VIEW_LOOKUP = 0;
+    private static int VIEW_LIST_ITEMS = 1;
+    private static int VIEW_LIST_SEARCH = 2;
 
-    DrawerLayout drawer;
+    private DrawerLayout mDrawerLayout;
+    private ActionBarDrawerToggle mDrawerToggle;
 
-    public static TextView mainContent;
-    public static ImageView imageView;
+    LibraryDBHelper dbHelper = null;
+
+    CharSequence mTitle;
+
+    class SearchItem {
+        String title;
+        String author;
+        String isbn13;
+        String isbn10;
+        byte[] image;
+    }
+
+    String mCurrentISBN;
+    Book mBook;
+    List<Book> bookList;
+    List<SearchItem> searchList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_lib_tracker);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-
-        mainContent = (TextView)findViewById(R.id.tvIsbnInfo);
-        imageView = (ImageView)findViewById(R.id.imageView);
-        if (imageView != null) {
-            imageView.setImageDrawable(getResources().getDrawable(R.drawable.no_image));
-        }
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
@@ -69,58 +94,79 @@ public class LibTrackerActivity extends AppCompatActivity
             }
         });
 
-        drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
-        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
-                this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
-        drawer.setDrawerListener(toggle);
-        toggle.syncState();
+        mDrawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
+        mDrawerToggle = new ActionBarDrawerToggle(
+                this, mDrawerLayout, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
+        mDrawerLayout.setDrawerListener(mDrawerToggle);
+        mDrawerToggle.syncState();
 
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
+
+        initializeDb();
+
+        selectItem(1);
+    }
+
+    private void initializeDb() {
+
+        dbHelper = LibraryDBHelper.createInstance(LibTrackerActivity.this);
+        if (!dbHelper.tableExists(Book.class)) {
+
+            dbHelper.createTable(Book.class);
+        }
     }
 
     @Override
     protected void onSaveInstanceState(Bundle savedInstanceState) {
         super.onSaveInstanceState(savedInstanceState);
-        if (mainContent != null) {
 
-            savedInstanceState.putString("bookInfo", mainContent.getText().toString());
-            if (imageView != null && imageView.getDrawable() != null) {
-
-                Bitmap bitmap = ((BitmapDrawable) imageView.getDrawable()).getBitmap();
-                ByteArrayOutputStream stream = new ByteArrayOutputStream();
-                bitmap.compress(Bitmap.CompressFormat.PNG, 90, stream);
-                byte[] image = stream.toByteArray();
-                savedInstanceState.putByteArray("image", image);
-            }
-        }
+        // save instance state for book view
+//        if (mainContent != null) {
+//
+//            savedInstanceState.putString("bookInfo", mainContent.getText().toString());
+//            if (imageView != null && imageView.getDrawable() != null) {
+//
+//                Bitmap bitmap = ((BitmapDrawable) imageView.getDrawable()).getBitmap();
+//                ByteArrayOutputStream stream = new ByteArrayOutputStream();
+//                bitmap.compress(Bitmap.CompressFormat.PNG, 90, stream);
+//                byte[] image = stream.toByteArray();
+//                savedInstanceState.putByteArray("image", image);
+//            }
+//        }
     }
     @Override
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
 
-        if (savedInstanceState != null) {
-
-            if (mainContent != null) {
-                mainContent.setText(savedInstanceState.getString("bookInfo"));
-            }
-
-            if (imageView != null) {
-                byte[] image = savedInstanceState.getByteArray("image");
-                if (image != null && image.length > 0) {
-                    imageView.setImageBitmap(BitmapFactory.decodeByteArray(image, 0, image.length));
-                }
-            }
-
-        }
+        // restore instance state for book view
+//        if (savedInstanceState != null) {
+//
+//            if (mainContent != null) {
+//
+//                mainContent.setText(savedInstanceState.getString("bookInfo"));
+//            }
+//
+//            if (imageView != null) {
+//
+//                byte[] image = savedInstanceState.getByteArray("image");
+//                if (image != null && image.length > 0) {
+//
+//                    imageView.setImageBitmap(BitmapFactory.decodeByteArray(image, 0, image.length));
+//                }
+//            }
+//        }
     }
 
     @Override
     public void onBackPressed() {
+
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         if (drawer.isDrawerOpen(GravityCompat.START)) {
+
             drawer.closeDrawer(GravityCompat.START);
         } else {
+
             super.onBackPressed();
         }
     }
@@ -156,9 +202,13 @@ public class LibTrackerActivity extends AppCompatActivity
         if (id == R.id.nav_camera) {
             // Handle the camera action
             Scanner.acquireCameraScan(LibTrackerActivity.this);
-        } else if (id == R.id.nav_gallery) {
+        } else if (id == R.id.nav_search) {
 
-        } else if (id == R.id.nav_slideshow) {
+            selectItem(0);
+
+        } else if (id == R.id.nav_my_books) {
+
+            selectItem(1);
 
         } else if (id == R.id.nav_manage) {
 
@@ -168,9 +218,132 @@ public class LibTrackerActivity extends AppCompatActivity
 
         }
 
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
-        drawer.closeDrawer(GravityCompat.START);
+        mDrawerLayout.closeDrawer(GravityCompat.START);
+
         return true;
+    }
+
+
+    /** Swaps fragments in the main content view */
+    private void selectItem(int position) {
+
+        // Create a new fragment and specify the planet to show based on position
+        Fragment fragment = new ContentFragment();
+        Bundle args = new Bundle();
+        args.putInt(ContentFragment.ARG_VIEW_NUMBER, position);
+        fragment.setArguments(args);
+
+        // Insert the fragment by replacing any existing fragment
+        FragmentManager fragmentManager = getFragmentManager();
+        fragmentManager.beginTransaction()
+                .replace(R.id.content_frame, fragment)
+                .commit();
+
+        populateViews(position);
+
+        // Highlight the selected item, update the title, and close the drawer
+        //mDrawerList.setItemChecked(position, true);
+        //setTitle(mPlanetTitles[position]);
+        //mDrawerLayout.closeDrawer(mDrawerList);
+    }
+
+    private void populateViews(int position) {
+
+        switch (position) {
+
+            case 0: //VIEW_LOOKUP
+                TextView info = (TextView)findViewById(R.id.tvIsbnInfo);
+                if (info != null) {
+                    if (mBook != null) {
+                        String isbnInfo = String.format("Title: %s\n", mBook.title);
+                        isbnInfo += String.format("Author: %s\n", mBook.author);
+                        isbnInfo += String.format("Description: %s\n", mBook.description);
+                        isbnInfo += String.format("Publisher: %s\n", mBook.publisher);
+                        isbnInfo += String.format("Pages: %d\n", mBook.pages);
+                        isbnInfo += String.format("Language: %s\n", mBook.language);
+                        isbnInfo += String.format("Category: %s\n", mBook.category);
+                        isbnInfo += String.format("Publication: %s\n", mBook.publication);
+                        info.setText(isbnInfo);
+
+                    } else {
+                        info.setText("Searching for book...");
+                    }
+                }
+                ImageView image = (ImageView)findViewById(R.id.imageView);
+                if (image != null) {
+                    if (mBook.thumbNail != null && mBook.thumbNail.length > 0) {
+                        image.setImageBitmap(BitmapFactory.decodeByteArray(mBook.thumbNail, 0, mBook.thumbNail.length));
+                    } else {
+                        image.setImageDrawable(getResources().getDrawable(R.drawable.no_image));
+                    }
+                }
+
+                break;
+            case 1:  //VIEW_LIST
+                // populate the book list
+                TextView empty = (TextView)findViewById(android.R.id.empty);
+                ListView listView = (ListView)findViewById(android.R.id.list);
+                if (listView != null) {
+                    bookList = dbHelper.getDatabaseListNoAppId(Book.class);
+                    if (bookList != null) {
+                        ItemListAdapter adapter = new ItemListAdapter(LibTrackerActivity.this, R.layout.item_list_item, (Book[]) bookList.toArray());
+                        listView.setEmptyView(empty);
+                        listView.setAdapter(adapter);
+                    }
+                }
+                break;
+            case 2:  //VIEW_SEARCH
+                // populate the search list
+                break;
+        }
+    }
+
+    /**
+     * Fragment that appears in the "content_frame", shows a planet
+     */
+    public static class ContentFragment extends Fragment {
+
+        public static final String ARG_VIEW_NUMBER = "view_number";
+
+        public static final int ARG_LIST = 0;
+        public static final int ARG_SEARCH = 1;
+        public static final int ARG_BOOK = 2;
+
+
+        public ContentFragment() {
+            // Empty constructor required for fragment subclasses
+        }
+
+        @Override
+        public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+
+            View rootView = null;
+            int i = getArguments().getInt(ARG_VIEW_NUMBER);
+
+            if (i == ARG_LIST) {
+
+                // inflate the list view and populate it
+                rootView = inflater.inflate(R.layout.fragment_list, container, false);
+
+            } else if (i == ARG_BOOK) {
+
+                // inflate the book view and populate it
+                rootView = inflater.inflate(R.layout.fragment_book, container, false);
+
+            } else if (i == ARG_SEARCH) {
+
+                // inflate the search view and populate it
+                rootView = inflater.inflate(R.layout.fragment_list, container, false);
+            }
+
+            return rootView;
+        }
+    }
+
+    @Override
+    public void setTitle(CharSequence title) {
+        mTitle = title;
+        getActionBar().setTitle(mTitle);
     }
 
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
@@ -181,27 +354,15 @@ public class LibTrackerActivity extends AppCompatActivity
             IntentResult scanResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, intent);
             if (scanResult != null && scanResult.getContents() != null) {
                 // handle scan result
-                //CommonUtils.makeShortToast(BRItemActivity.this, String.format("You scanned: %s", scanResult.getContents()));
-                updateBarcodeFragment(scanResult.getContents());
+                mBook = new Book();
+                mCurrentISBN = scanResult.getContents();
+
+                GetISBNInfo getISBNInfo = new GetISBNInfo();
+                getISBNInfo.execute(String.format("http://isbndb.com/api/v2/json/W8INIP1P/books?q=%s", mCurrentISBN));
             }
-            drawer.closeDrawer(GravityCompat.START);
+            mDrawerLayout.closeDrawer(GravityCompat.START);
         }
     }
-
-    private void updateBarcodeFragment(String barcode) {
-
-        if (mainContent != null) {
-            mainContent.setText("Searching for book...");
-        }
-
-        GetISBNInfo getISBNInfo = new GetISBNInfo();
-        getISBNInfo.execute(String.format("http://isbndb.com/api/v2/json/W8INIP1P/books?q=%s", barcode));
-
-        GoogleInfo googleBookInfo = new GoogleInfo();
-        googleBookInfo.execute(String.format("https://www.googleapis.com/books/v1/volumes?q=isbn:%s", barcode));
-    }
-
-
 
     class GetISBNInfo extends AsyncTask<String, Void, String> {
 
@@ -227,8 +388,10 @@ public class LibTrackerActivity extends AppCompatActivity
                 return String.format("Found %d from ISBNDb", isbnDbInfo.resultCount);
 
             } catch (IOException e) {
+
                 e.printStackTrace();
             } catch (Exception e) {
+
                 e.printStackTrace();
             }
 
@@ -238,13 +401,31 @@ public class LibTrackerActivity extends AppCompatActivity
         @Override
         protected void onPostExecute(String result) {
 
-            if (mainContent != null) {
-                mainContent.setText(mainContent.getText() + "\n" + result);
+            if (mBook == null) {
+                mBook = new Book();
+            }
+            if (mBook != null) {
                 if (isbnDbInfo != null) {
-                    mainContent.setText(mainContent.getText() + "\nTitle: " + isbnDbInfo.data.get(0).title);
-                    mainContent.setText(mainContent.getText() + "\nAuthor: " + isbnDbInfo.data.get(0).authorData.get(0).name);
+                    Datum datum = isbnDbInfo.data.get(0);
+                    if (datum != null) {
+                        mBook.title = datum.title;
+                        mBook.isbn10 = datum.isbn10;
+                        mBook.isbn13 = datum.isbn13;
+                        mBook.category = datum.subjectIds.get(0);
+                        mBook.description = datum.physicalDescriptionText;
+                        mBook.publisher = datum.publisherName;
+                        mBook.publication = datum.publisherText;
+                        mBook.language = datum.language;
+                        //mBook.pages = datum.pages?
+                        AuthorDatum authorDatum = datum.authorData.get(0);
+                        mBook.author = authorDatum.name;
+
+                    }
                 }
             }
+
+            GoogleInfo googleBookInfo = new GoogleInfo();
+            googleBookInfo.execute(String.format("https://www.googleapis.com/books/v1/volumes?q=isbn:%s", mCurrentISBN));
         }
     }
 
@@ -257,6 +438,7 @@ public class LibTrackerActivity extends AppCompatActivity
         protected String doInBackground(String... urls) {
 
             try {
+
                 OkHttpClient client = new OkHttpClient();
                 Request request = new Request.Builder()
                         .url(urls[0])
@@ -273,10 +455,14 @@ public class LibTrackerActivity extends AppCompatActivity
                 googleBookInfo = gson.fromJson(jsonData, GoogleBookInfo.class);
 
                 if (googleBookInfo != null) {
+
                     if(googleBookInfo.items != null && googleBookInfo.items.size() > 0) {
+
                         VolumeInfo volumeInfo = googleBookInfo.items.get(0).volumeInfo;
                         if (volumeInfo != null && volumeInfo.imageLinks != null) {
+
                             if (volumeInfo.imageLinks.thumbnail != null && !volumeInfo.imageLinks.thumbnail.isEmpty()) {
+
                                 String url = volumeInfo.imageLinks.thumbnail;
                                 bytes = imageByter(url);
                             }
@@ -296,38 +482,67 @@ public class LibTrackerActivity extends AppCompatActivity
         @Override
         protected void onPostExecute(String result) {
 
-            if (mainContent != null) {
-                mainContent.setText(mainContent.getText() + "\n" + result);
+            if (mBook == null) {
+                mBook = new Book();
+            }
+            if (mBook != null) {
 
                 if (googleBookInfo != null) {
 
                     if (googleBookInfo.items != null && googleBookInfo.items.size() > 0) {
-                        mainContent.setText(mainContent.getText() + "\nTitle: " + googleBookInfo.items.get(0).volumeInfo.title);
-                        mainContent.setText(mainContent.getText() + "\nAuthor: " + googleBookInfo.items.get(0).volumeInfo.authors);
+
+                        Item item = googleBookInfo.items.get(0);
+                        if (item != null && item.volumeInfo != null) {
+
+                            if (mBook.title == null) {
+
+                                mBook.title = item.volumeInfo.title;
+                            }
+                            if (mBook.author == null) {
+
+                                mBook.author = item.volumeInfo.authors.get(0);
+                            }
+
+                            mBook.pages = item.volumeInfo.pageCount;
+                            if (item.volumeInfo.categories != null && item.volumeInfo.categories.size() > 0) {
+
+                                mBook.category = item.volumeInfo.categories.get(0);
+                            }
+                        }
+                        //mainContent.setText(mainContent.getText() + "\nTitle: " + googleBookInfo.items.get(0).volumeInfo.title);
+                        //mainContent.setText(mainContent.getText() + "\nAuthor: " + googleBookInfo.items.get(0).volumeInfo.authors);
                     }
 
                     if (bytes != null && bytes.length > 0) {
-                        imageView.setImageBitmap(BitmapFactory.decodeByteArray(bytes, 0, bytes.length));
+
+                        mBook.thumbNail = bytes.clone();
                     }
                 }
             }
+            selectItem(0);
         }
 
         protected byte[] imageByter(String strurl) {
+
             try {
+
                 URL url = new URL(strurl);
                 InputStream is = (InputStream) url.getContent();
                 byte[] buffer = new byte[8192];
                 int bytesRead;
                 ByteArrayOutputStream output = new ByteArrayOutputStream();
                 while ((bytesRead = is.read(buffer)) != -1) {
+
                     output.write(buffer, 0, bytesRead);
                 }
                 return output.toByteArray();
+
             } catch (MalformedURLException e) {
+
                 e.printStackTrace();
                 return null;
             } catch (IOException e) {
+
                 e.printStackTrace();
                 return null;
             }

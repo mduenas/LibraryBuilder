@@ -1,12 +1,12 @@
-package com.markduenas.librarybuilder.db.GoogleBooks;
+package com.markduenas.librarybuilder.api.GoogleBooks;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
-
 /**
  * Created by markduenas on 11/25/15.
  */
-public class Epub {
+
+public class Pdf {
 
     @SerializedName("isAvailable")
     @Expose

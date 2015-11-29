@@ -1,4 +1,4 @@
-package com.markduenas.librarybuilder.db.GoogleBooks;
+package com.markduenas.librarybuilder.api.GoogleBooks;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
@@ -6,10 +6,10 @@ import com.google.gson.annotations.SerializedName;
  * Created by markduenas on 11/25/15.
  */
 
-public class Pdf {
+public class SearchInfo {
 
-    @SerializedName("isAvailable")
+    @SerializedName("textSnippet")
     @Expose
-    public Boolean isAvailable;
+    public String textSnippet;
 
 }
