@@ -3,9 +3,7 @@ package com.markduenas.librarybuilder;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.content.Intent;
-import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.drawable.BitmapDrawable;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
@@ -52,10 +50,6 @@ import java.util.List;
 
 
 public class LibTrackerActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener, ListView.OnItemClickListener {
-
-    private static int VIEW_LIST = 0;
-    private static int VIEW_SEARCH = 1;
-    private static int VIEW_BOOK = 2;
 
     private DrawerLayout mDrawerLayout;
     private ActionBarDrawerToggle mDrawerToggle;
@@ -111,7 +105,7 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
                         dbHelper.insertSingleDatabaseRowNoAppId(Book.class, mBook);
                         Snackbar.make(view, String.format("%s has been added to your library!", mBook.title), Snackbar.LENGTH_LONG)
                                 .setAction("Action", null).show();
-                        selectItem(VIEW_LIST);
+                        selectItem(ContentFragment.ARG_LIST);
                     } else {
 
                         List<Book> temp = dbHelper.getDatabaseListFiltered(Book.class, field, value);
@@ -121,7 +115,7 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
                             dbHelper.insertSingleDatabaseRowNoAppId(Book.class, mBook);
                             Snackbar.make(view, String.format("%s has been added to your library!", mBook.title), Snackbar.LENGTH_LONG)
                                     .setAction("Action", null).show();
-                            selectItem(VIEW_LIST);
+                            selectItem(ContentFragment.ARG_LIST);
                         } else {
 
                             // possible duplicate?
@@ -148,7 +142,7 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
 
         initializeDb();
 
-        selectItem(VIEW_LIST);
+        selectItem(ContentFragment.ARG_LIST);
     }
 
     private void initializeDb() {
@@ -247,11 +241,11 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
             Scanner.acquireCameraScan(LibTrackerActivity.this);
         } else if (id == R.id.nav_search) {
 
-            selectItem(VIEW_SEARCH);
+            selectItem(ContentFragment.ARG_SEARCH);
 
         } else if (id == R.id.nav_my_books) {
 
-            selectItem(VIEW_LIST);
+            selectItem(ContentFragment.ARG_LIST);
 
         } else if (id == R.id.nav_manage) {
 
@@ -282,30 +276,10 @@ public class LibTrackerActivity extends AppCompatActivity implements NavigationV
                 .replace(R.id.content_frame, fragment)
                 .commit();
 
-        populateViews(position);
-
         // Highlight the selected item, update the title, and close the drawer
         //mDrawerList.setItemChecked(position, true);
         //setTitle(mPlanetTitles[position]);
         //mDrawerLayout.closeDrawer(mDrawerList);
-    }
-
-    private void populateViews(int position) {
-
-        switch (position) {
-
-            case 0: //VIEW_SEARCH
-
-
-                break;
-            case 1:  //VIEW_LIST
-                // populate the book list
-
-                break;
-            case 2:  //VIEW_BOOK
-
-                break;
-        }
     }
 
     /**
